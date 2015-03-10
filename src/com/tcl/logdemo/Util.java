@@ -41,6 +41,13 @@ import android.util.Log;
 public class Util {
 
     public static final String TAG = "LogUp/Util";
+    
+    /**
+     * The default buffer size ({@value}) used by
+     * {@link #copyStream  copyStream } and {@link #copyReader  copyReader}
+     * and by the copyReader/copyStream methods if a zero or negative buffer size is supplied.
+     */
+    public static final int DEFAULT_COPY_BUFFER_SIZE = 1024;
 
     public static void logd() {
         String fileName = Thread.currentThread().getStackTrace()[3].getFileName();
@@ -376,6 +383,92 @@ public class Util {
         addElement(infoElement, PhoneInfo.DESCRIPTION, description);
         
         return createXMLFile(document, filename);
+    }
+    
+    /***
+     * Copies the contents of an InputStream to an OutputStream using a
+     * copy buffer of a given size and notifies the provided
+     * CopyStreamListener of the progress of the copy operation by calling
+     * its bytesTransferred(long, int) method after each write to the
+     * destination.  If you wish to notify more than one listener you should
+     * use a CopyStreamAdapter as the listener and register the additional
+     * listeners with the CopyStreamAdapter.
+     * <p>
+     * The contents of the InputStream are
+     * read until the end of the stream is reached, but neither the
+     * source nor the destination are closed.  You must do this yourself
+     * outside of the method call.  The number of bytes read/written is
+     * returned.
+     * <p>
+     * @param source  The source InputStream.
+     * @param dest    The destination OutputStream.
+     * @param bufferSize  The number of bytes to buffer during the copy.
+     *            A zero or negative value means to use {@link #DEFAULT_COPY_BUFFER_SIZE}.
+     * @param streamSize  The number of bytes in the stream being copied.
+     *          Should be set to CopyStreamEvent.UNKNOWN_STREAM_SIZE if unknown.
+     * @param listener  The CopyStreamListener to notify of progress.  If
+     *      this parameter is null, notification is not attempted.
+     * @param flush Whether to flush the output stream after every
+     *        write.  This is necessary for interactive sessions that rely on
+     *        buffered streams.  If you don't flush, the data will stay in
+     *        the stream buffer.
+     * @exception CopyStreamException  If an error occurs while reading from the
+     *            source or writing to the destination.  The CopyStreamException
+     *            will contain the number of bytes confirmed to have been
+     *            transferred before an
+     *            IOException occurred, and it will also contain the IOException
+     *            that caused the error.  These values can be retrieved with
+     *            the CopyStreamException getTotalBytesTransferred() and
+     *            getIOException() methods.
+     ***/
+    public static final long copyStream(InputStream source, OutputStream dest,
+                                        int bufferSize, long streamSize,
+                                        FileTransferListener listener,
+                                        boolean flush) throws IOException {
+        int bytes;
+        long total = 0;
+        byte[] buffer = new byte[bufferSize >= 0 ? bufferSize : DEFAULT_COPY_BUFFER_SIZE];
+
+        try
+        {
+            while ((bytes = source.read(buffer)) != -1)
+            {
+                // Technically, some read(byte[]) methods may return 0 and we cannot
+                // accept that as an indication of EOF.
+
+                if (bytes == 0)
+                {
+                    bytes = source.read();
+                    if (bytes < 0) {
+                        break;
+                    }
+                    dest.write(bytes);
+                    if(flush) {
+                        dest.flush();
+                    }
+                    ++total;
+                    if (listener != null) {
+                        listener.bytesTransferred(total, 1);
+                    }
+                    continue;
+                }
+
+                dest.write(buffer, 0, bytes);
+                if(flush) {
+                    dest.flush();
+                }
+                total += bytes;
+                if (listener != null) {
+                    listener.bytesTransferred(total, bytes);
+                }
+            }
+        }
+        catch (IOException e)
+        {
+            throw new IOException("IOException caught while copying.", e);
+        }
+
+        return total;
     }
     
     public static void upDone(String filename) {

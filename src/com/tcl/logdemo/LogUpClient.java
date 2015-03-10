@@ -3,6 +3,7 @@ package com.tcl.logdemo;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
@@ -144,6 +145,44 @@ public class LogUpClient {
         try {
             InputStream input = new FileInputStream(filepath);
             status = ftp.storeFile(filename, input);
+            input.close();
+
+            ftp.noop(); // check that control connection is working OK
+            ftp.logout();
+
+        } catch (IOException e) {
+            status = false;
+            e.printStackTrace();
+
+        } finally {
+            if (ftp.isConnected()) {
+                try {
+                    ftp.disconnect();
+                } catch (IOException f){
+                    // do nothing
+                }
+            }
+        }
+
+        if (status) {
+            Log.i(TAG, "upload Ok.");
+        } else {
+            Log.i(TAG, "upload Error.");
+        }
+
+        return status;
+    }
+    
+    public boolean upload(String filename, String filepath, FileTransferListener ftl) {
+        boolean status = false;
+        if (ftp == null) {
+            return false;
+        }
+
+        try {
+            InputStream input = new FileInputStream(filepath);
+            OutputStream output = ftp.storeFileStream(filename);
+            Util.copyStream(input, output, -1, -1, ftl, false);
             input.close();
 
             ftp.noop(); // check that control connection is working OK
