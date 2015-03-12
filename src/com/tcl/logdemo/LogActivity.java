@@ -194,10 +194,33 @@ public class LogActivity extends Activity {
         String[] srcPaths = { infoFile.getAbsolutePath(), logfile.getAbsolutePath() };
         String destPath = externalStoragePath + "/Download/";
         
+        FileTransferListener listener = new FileTransferListener() {
+
+            @Override
+            public void prepareTransfer(long totalBytes) {
+                // TODO Auto-generated method stub
+                
+            }
+
+            @Override
+            public void bytesTransferred(long totalBytesTransferred,
+                    int bytesTransferred, long streamSize) {
+                // TODO Auto-generated method stub
+                
+            }
+
+            @Override
+            public void transferComplete() {
+                // TODO Auto-generated method stub
+                
+            }
+            
+        };
+        
         try {
-            File file = Util.archive(srcPaths, destPath);
+            File file = Util.archive(srcPaths, destPath, listener);
             Log.d(TAG, "archive finish, file name is " + file.getName());
-            file = Util.compress(file);
+            file = Util.compress(file, listener);
             Log.d(TAG, "compress finish, file name is " + file.getName());
             
             Intent serviceIntent = new Intent(LogActivity.this, LogUpService.class);

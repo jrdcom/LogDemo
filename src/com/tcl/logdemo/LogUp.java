@@ -1,5 +1,9 @@
 package com.tcl.logdemo;
 
+import java.io.File;
+
+import android.os.Environment;
+
 public class LogUp {
 
     public static String server = "192.168.1.100";
@@ -12,8 +16,10 @@ public class LogUp {
     
     public static final String TAR_EXT = ".tar";
     public static final String GZIP_EXT = ".gz";
-    @Override
-    public String toString() {
+    
+    public String externalStoragePath = Environment.getExternalStorageDirectory().getPath();
+    
+    public static String getString() {
         StringBuilder builder = new StringBuilder();
         builder.append("server:" + server);
         builder.append("port:" + port);
@@ -22,5 +28,17 @@ public class LogUp {
         return "LogUp [ status = " + builder.toString() + "]";
     }
     
+    public static File getHomeDirectory() {
+        String path = Environment.getExternalStorageDirectory().getPath() + "/LogUp";
+        File home = new File(path);
+        if (!home.exists()) {
+            home.mkdirs();
+        }
+        return home;
+    }
     
+    public static String getHomePath() {
+        File home = getHomeDirectory();
+        return home.getPath();
+    }
 }

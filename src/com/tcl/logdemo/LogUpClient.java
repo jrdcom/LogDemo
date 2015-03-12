@@ -1,5 +1,6 @@
 package com.tcl.logdemo;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -173,7 +174,7 @@ public class LogUpClient {
         return status;
     }
     
-    public boolean upload(String filename, String filepath, FileTransferListener ftl) {
+    public boolean upload(String filename, String filepath, FileTransferListener listener) {
         boolean status = false;
         if (ftp == null) {
             return false;
@@ -182,8 +183,28 @@ public class LogUpClient {
         try {
             InputStream input = new FileInputStream(filepath);
             OutputStream output = ftp.storeFileStream(filename);
-            Util.copyStream(input, output, -1, -1, ftl, false);
+
+            long length = new File(filepath).length();
+            if (listener != null) {
+                listener.prepareTransfer(length);
+            }
+
+            long size = Util.copyStream(input, output, -1, -1, listener, false);
+
+            output.close();
             input.close();
+
+            if(ftp.completePendingCommand() && length == size) {
+                status = true;
+            }
+
+            if (listener != null) {
+                if (status) {
+                    listener.transferComplete();
+                } else {
+                    Log.i(TAG, "upload bytes is " + size + ", total bytes is " + length);
+                }
+            }
 
             ftp.noop(); // check that control connection is working OK
             ftp.logout();

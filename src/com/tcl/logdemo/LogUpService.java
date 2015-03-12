@@ -1,9 +1,13 @@
 package com.tcl.logdemo;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPCmd;
+
+import com.tcl.logdemo.LogListActivity.ArchiveListener;
 
 import android.app.IntentService;
 import android.content.Intent;
@@ -53,7 +57,8 @@ public class LogUpService extends IntentService {
                     e.printStackTrace();
                 }
                 String filename = filepath.substring(filepath.lastIndexOf("/")+1);
-                boolean status = client.upload(filename, filepath);
+                ArchiveListener listener = new ArchiveListener();
+                boolean status = client.upload(filename, filepath, listener);
                 if (status) {
                     Util.upDone(filename);
                     Log.d(TAG, "upload log finish");
@@ -62,6 +67,40 @@ public class LogUpService extends IntentService {
                 }
             }
             Log.d(TAG, "LogUpService finish");
+        }
+    }
+    
+    class ArchiveListener implements FileTransferListener {
+        
+        BigDecimal totalSizeBigDecimal;
+        long totalTransferred;
+        private String lastProgress = "";
+
+        public void prepareTransfer(long totalBytes) {
+            Log.d(TAG, "FileTransferListener prepareTransfer totalBytes is " + totalBytes);
+            totalSizeBigDecimal = new BigDecimal(totalBytes);
+            totalTransferred = 0;
+        }
+
+        public void bytesTransferred(long totalBytesTransferred,
+                int bytesTransferred, long streamSize) {
+            
+            totalTransferred += bytesTransferred;
+            
+            BigDecimal bytesTransferredBigDecimal = new BigDecimal(totalTransferred);
+            String progress = bytesTransferredBigDecimal.
+                    divide(totalSizeBigDecimal, 2, RoundingMode.DOWN).toString();
+            
+            if (!lastProgress.equalsIgnoreCase(progress)) {
+                Log.d(TAG, "transfer progress is " + progress +
+                        ", total is " + totalTransferred);
+            }
+            lastProgress = progress;
+        }
+
+        @Override
+        public void transferComplete() {
+            Log.d(TAG, "FileTransferListener transferComplete");
         }
     }
 }

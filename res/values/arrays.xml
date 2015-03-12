@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <string-array translatable="false" name="log_file_path">
+        <!-- sdcard TCTReport /sdcard/TCTReport -->
+        <item>@string/sdcard_TCTReport</item>
+        <!-- sdcard TCTReport /sdcard1/TCTReport -->
+        <item>@string/sdcard1_TCTReport</item>
+        <!-- sdcard2 TCTReport /storage/sdcard1/TCTReport -->
+        <item>@string/storage_sdcard1_TCTReport</item>
+        <!-- sdcard /ram_dump /storage/sdcard0/ram_dump -->
+        <item>@string/storage_sdcard0_ram_dump</item>
+        <!-- sdcard /ram_dump /storage/sdcard1/ram_dump -->
+        <item>@string/storage_sdcard1_ram_dump</item>
+        <!-- trace /data/anr -->
+        <item>@string/data_anr</item>
+        <!-- JRD_RECORD /data/jrdrecord -->
+        <item>@string/data_jrdrecord</item>
+        <!-- bt snoop log /sdcard/btsnoop_hci.log -->
+        <item>@string/sdcard_btsnoop_hci_log</item>
+        <!-- bt audio sample /data/audio/ -->
+        <item>@string/data_audio</item>
+        <!-- data aee db /data/aee_exp -->
+        <item>@string/data_aee_exp</item>
+        <!-- data mobilelog /data/TCTReport -->
+        <item>@string/data_TCTReport</item>
+        <!-- NE core /data/core -->
+        <item>@string/data_core</item>
+        <!-- battery log /storage/sdcard0/batterylog -->
+        <item>@string/storage_sdcard0_batterylog</item>
+        <!-- battery log /storage/sdcard1/batterylog -->
+        <item>@string/storage_sdcard1_batterylog</item>
+        <!-- last_kmsg /data/ram_console -->
+        <item>@string/data_ram_console</item>
+        <!-- mobile_info /mobile_info/powerup_reason -->
+        <item>@string/mobile_info_powerup_reason</item>
+        <!-- mobile_info /mobile_info/ram_console -->
+        <item>@string/mobile_info_ram_console</item>
+        <!-- mobile_info /mobile_info/jrdrecord -->
+        <item>@string/mobile_info_jrdrecord</item>
+        <!-- mobile_info /mobile_info/userdata.ver -->
+        <item>@string/mobile_info_userdata_ver</item>
+        <!-- FOTA recovery LOG /cache/recovery -->
+        <item>@string/cache_recovery</item>
+    </string-array>
+
+</resources>

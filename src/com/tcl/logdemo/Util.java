@@ -9,9 +9,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.UUID;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -48,6 +51,8 @@ public class Util {
      * and by the copyReader/copyStream methods if a zero or negative buffer size is supplied.
      */
     public static final int DEFAULT_COPY_BUFFER_SIZE = 1024;
+    public static final int LARGE_COPY_BUFFER_SIZE = 8024;
+    public static final int SEEK_TIME_OUT = 10 * 1000;
 
     public static void logd() {
         String fileName = Thread.currentThread().getStackTrace()[3].getFileName();
@@ -93,26 +98,30 @@ public class Util {
         return time;
     }
 
-    public static File archive(String srcPath, String destPath) throws IOException {
-        return archive(new File(srcPath), new File(destPath));
+    public static File archive(String srcPath, String destPath,
+            FileTransferListener listener) throws IOException {
+        return archive(new File(srcPath), new File(destPath), listener);
     }
 
     // srcFile is file or directory, destFile is file or directory
-    public static File archive(File srcFile, File destFile) throws IOException {
-        return archive(new File[]{srcFile,}, destFile);
+    public static File archive(File srcFile, File destFile,
+            FileTransferListener listener) throws IOException {
+        return archive(new File[]{srcFile,}, destFile, listener);
     }
     
-    public static File archive(String[] srcPaths, String destPath) throws IOException {
+    public static File archive(String[] srcPaths, String destPath,
+            FileTransferListener listener) throws IOException {
         ArrayList<File> fileList = new ArrayList<File>();
         for (String srcPath : srcPaths) {
             fileList.add(new File(srcPath));
         }
         File[] fileArray = new File[fileList.size()];
-        return archive(fileList.toArray(fileArray), new File(destPath));
+        return archive(fileList.toArray(fileArray), new File(destPath), listener);
         //archive(fileList.toArray(new File[]{}), destFile, null);
     }
     
-    public static File archive(File[] srcFile, File destFile) throws IOException {
+    public static File archive(File[] srcFile, File destFile,
+            FileTransferListener listener) throws IOException {
         // init variable
         String destPath = destFile.getAbsolutePath();
         String archiveFilePath = destPath;
@@ -146,19 +155,46 @@ public class Util {
         // create *.tar file
         File archiveFile = fileProber(archiveFilePath);
         
+        // get all files in srcFile
+        ArrayList<File> fileList = new ArrayList<File>();
+        for (File file : srcFile) {
+            fileList.addAll(getFolderFiles(file.getPath()));
+        }
+        
+        //  get all files size map
+        HashMap<File, Long> fileSizeMap = new HashMap<File, Long>();
+        long totalSize = 0;
+        for (File file : fileList) {
+            long length = file.length();
+            fileSizeMap.put(file, length);
+            totalSize += length;
+        }
+        
+        // notify listener to prepare transfer
+        if (listener != null) {
+            listener.prepareTransfer(totalSize);
+        }
+        
         // start archive srcFile
         TarArchiveOutputStream taos =
                 new TarArchiveOutputStream(new FileOutputStream(archiveFile));
         
         for (File file : srcFile) {
-            archive(file, taos, "");
+            boolean success = archive(file, fileSizeMap, taos, "", listener);
+            if(!success) return null;
         }
+        
         taos.flush();
         taos.close();
+        
+        if (listener != null) {
+            listener.transferComplete();
+        }
         return archiveFile;
     }
 
-    private static void archive(File file, TarArchiveOutputStream taos, String basePath) throws IOException {
+    private static boolean archive(File file, HashMap<File, Long> fileSizeMap, TarArchiveOutputStream taos,
+            String basePath, FileTransferListener listener) throws IOException {
 
         if (file.isDirectory()) {
             TarArchiveEntry entry = new TarArchiveEntry(basePath + file.getName() + File.separator);
@@ -167,20 +203,34 @@ public class Util {
 
             File[] files = file.listFiles();
             for (File f : files) {
-                archive(f, taos, basePath + file.getName() + File.separator);
+                boolean success = archive(f, fileSizeMap, taos, basePath + file.getName() +
+                        File.separator, listener);
+                if(!success) return false;
             }
 
         } else {
             TarArchiveEntry entry = new TarArchiveEntry(basePath + file.getName());
-            entry.setSize(file.length());
+            Long fileLength = fileSizeMap.get(file);
+            entry.setSize(fileLength);
             taos.putArchiveEntry(entry);
 
             BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
-            IOUtils.copy(bis, taos);
+            //IOUtils.copy(bis, taos);
+
+            long copySize = copyStream(bis, taos, LARGE_COPY_BUFFER_SIZE, fileLength, listener, false);
 
             bis.close();
             taos.closeArchiveEntry();
+
+            if (copySize == fileLength) {
+                return true;
+            } else {
+                Log.w(TAG, "archive file " + file.getName() + " failed");
+                return false;
+            }
         }
+
+        return true;
     }
     
     public static void dearchive(String srcPath) throws IOException {
@@ -278,7 +328,7 @@ public class Util {
         return false;
     }
     
-    public static File compress(File srcFile) throws IOException, CompressorException {
+    public static File compress(File srcFile, FileTransferListener listener) throws IOException, CompressorException {
         if(srcFile == null) return null;
         
         String destPath = srcFile.getAbsolutePath() + LogUp.GZIP_EXT;
@@ -289,11 +339,25 @@ public class Util {
                 new CompressorStreamFactory().
                     createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
         InputStream is = new FileInputStream(srcFile);
-        IOUtils.copy(is, cos);
+        //IOUtils.copy(is, cos);
+        if (listener != null) {
+            listener.prepareTransfer(srcFile.length());
+        }
+        
+        long copySize = copyStream(is, cos, LARGE_COPY_BUFFER_SIZE, -1, listener, false);
+        Log.d(TAG, "compress copySize is " + copySize);
         
         is.close();
         cos.flush();
         cos.close();
+        
+        if (listener != null && srcFile.length() == copySize) {
+            listener.transferComplete();
+        }
+        
+        if (srcFile.length() != copySize) {
+            return null;
+        }
         
         return destFile;
     }
@@ -405,7 +469,7 @@ public class Util {
      * @param bufferSize  The number of bytes to buffer during the copy.
      *            A zero or negative value means to use {@link #DEFAULT_COPY_BUFFER_SIZE}.
      * @param streamSize  The number of bytes in the stream being copied.
-     *          Should be set to CopyStreamEvent.UNKNOWN_STREAM_SIZE if unknown.
+     *          Should be set to -1 if unknown.
      * @param listener  The CopyStreamListener to notify of progress.  If
      *      this parameter is null, notification is not attempted.
      * @param flush Whether to flush the output stream after every
@@ -427,7 +491,8 @@ public class Util {
                                         boolean flush) throws IOException {
         int bytes;
         long total = 0;
-        byte[] buffer = new byte[bufferSize >= 0 ? bufferSize : DEFAULT_COPY_BUFFER_SIZE];
+        bufferSize = bufferSize >= 0 ? bufferSize : DEFAULT_COPY_BUFFER_SIZE;
+        byte[] buffer = new byte[bufferSize];
 
         try
         {
@@ -438,6 +503,7 @@ public class Util {
 
                 if (bytes == 0)
                 {
+                    Log.w(TAG, "bytes to read is 0");
                     bytes = source.read();
                     if (bytes < 0) {
                         break;
@@ -448,9 +514,23 @@ public class Util {
                     }
                     ++total;
                     if (listener != null) {
-                        listener.bytesTransferred(total, 1);
+                        listener.bytesTransferred(total, 1, streamSize);
                     }
                     continue;
+                }
+
+                if (streamSize > 0) {
+                    BigDecimal streamSizeBigDecimal = new BigDecimal(streamSize);
+                    long remain = streamSizeBigDecimal.subtract(new BigDecimal(total)).longValue();
+                    if (remain < bufferSize) {
+                        if (remain <= 0) {
+                            Log.w(TAG, "request to write '" + bytes
+                                    + "' bytes exceeds size in header of '"
+                                    + streamSize + "' bytes for entry, remain size is " + remain);
+                            break;
+                        }
+                        bytes = (int) remain;
+                    }
                 }
 
                 dest.write(buffer, 0, bytes);
@@ -459,7 +539,7 @@ public class Util {
                 }
                 total += bytes;
                 if (listener != null) {
-                    listener.bytesTransferred(total, bytes);
+                    listener.bytesTransferred(total, bytes, streamSize);
                 }
             }
         }
@@ -469,6 +549,115 @@ public class Util {
         }
 
         return total;
+    }
+    
+    /**
+     * Get folder size
+     * @param file  the target directory
+     * @return long
+     */
+    public static long getFolderSize(File file) {
+        return getFolderSize(file.getAbsolutePath());
+    }
+    
+    /**
+     * Get folder size
+     * @param file  the target directory
+     * @return long
+     */
+    public static long getFolderSize(String path) {
+        ArrayList<File> fileList = getFolderFiles(path);
+        if (fileList != null) {
+            long size = 0;
+            for (File file : fileList) {
+                size = size + file.length();
+            }
+            return size;
+        } else {
+            return -1;
+        }
+    }
+    
+    public static ArrayList<File> getFolderFiles(String path) {
+ 
+        long startTime = System.currentTimeMillis();
+
+        ArrayList<File> fileArrayList = new ArrayList<File>();
+        LinkedList<String> dirList = new LinkedList<String>();
+        dirList.add(path);
+        
+        File file = new File(path);
+        if (file.exists()) {
+            if (!file.isDirectory()) {
+                Log.d(TAG, path + " is not a directory!");
+                fileArrayList.add(file);
+                return fileArrayList;
+            }
+        } else {
+            Log.d(TAG, path + " not exist");
+            return null;
+        }
+
+        while( (dirList.size() > 0) && ((System.currentTimeMillis() - startTime) < SEEK_TIME_OUT) ) {
+            String filepath = dirList.poll();
+            Log.d(TAG, "current operate dir is " + filepath);
+            File dir = new File(filepath);
+
+            try {
+                File[] fileList = dir.listFiles();
+                if (fileList == null) continue;
+
+                for (int i = 0; i < fileList.length; i++)
+                {
+                    if (fileList[i].isDirectory()) {
+                        dirList.add(fileList[i].getAbsolutePath());
+                        Log.d(TAG, "folder path = " + fileList[i].getAbsolutePath());
+
+                    } else {
+                        fileArrayList.add(fileList[i]);
+                        Log.d(TAG, "file path = " + fileList[i].getAbsolutePath() +
+                                ", file size = " + fileList[i].length());
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        Log.d(TAG, "elapsed time is " + (System.currentTimeMillis() - startTime));
+        return fileArrayList;
+    }
+    
+    /**
+     * Format folder size
+     * @param size
+     * @return
+     */
+    public static String getFormatSize(double size) {
+        double kiloByte = size/1024;
+        if(kiloByte < 1) {
+            return size + "Byte(s)";
+        }
+        
+        double megaByte = kiloByte/1024;
+        if(megaByte < 1) {
+            BigDecimal result1 = new BigDecimal(Double.toString(kiloByte));
+            return result1.setScale(2, BigDecimal.ROUND_HALF_UP).toPlainString() + "KB";
+        }
+        
+        double gigaByte = megaByte/1024;
+        if(gigaByte < 1) {
+            BigDecimal result2  = new BigDecimal(Double.toString(megaByte));
+            return result2.setScale(2, BigDecimal.ROUND_HALF_UP).toPlainString() + "MB";
+        }
+        
+        double teraBytes = gigaByte/1024;
+        if(teraBytes < 1) {
+            BigDecimal result3 = new BigDecimal(Double.toString(gigaByte));
+            return result3.setScale(2, BigDecimal.ROUND_HALF_UP).toPlainString() + "GB";
+        }
+        BigDecimal result4 = new BigDecimal(teraBytes);
+        return result4.setScale(2, BigDecimal.ROUND_HALF_UP).toPlainString() + "TB";
     }
     
     public static void upDone(String filename) {

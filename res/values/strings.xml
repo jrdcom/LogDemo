@@ -2,4 +2,25 @@
 
     <string name="app_name">LogDemo</string>
 
+    <string name="sdcard_TCTReport">/sdcard/TCTReport</string>
+    <string name="sdcard1_TCTReport">/sdcard1/TCTReport</string>
+    <string name="storage_sdcard1_TCTReport">/storage/sdcard1/TCTReport</string>
+    <string name="storage_sdcard0_ram_dump">/storage/sdcard0/ram_dump</string>
+    <string name="storage_sdcard1_ram_dump">/storage/sdcard1/ram_dump</string>
+    <string name="data_anr">/data/anr</string>
+    <string name="data_jrdrecord">/data/jrdrecord</string>
+    <string name="sdcard_btsnoop_hci_log">/sdcard/btsnoop_hci.log</string>
+    <string name="data_audio">/data/audio/</string>
+    <string name="data_aee_exp">/data/aee_exp</string>
+    <string name="data_TCTReport">/data/TCTReport</string>
+    <string name="data_core">/data/core</string>
+    <string name="storage_sdcard0_batterylog">/storage/sdcard0/batterylog</string>
+    <string name="storage_sdcard1_batterylog">/storage/sdcard1/batterylog</string>
+    <string name="data_ram_console">/data/ram_console</string>
+    <string name="mobile_info_powerup_reason">/mobile_info/powerup_reason</string>
+    <string name="mobile_info_ram_console">/mobile_info/ram_console</string>
+    <string name="mobile_info_jrdrecord">/mobile_info/jrdrecord</string>
+    <string name="mobile_info_userdata_ver">/mobile_info/userdata.ver</string>
+    <string name="cache_recovery">/cache/recovery</string>
+
 </resources>
